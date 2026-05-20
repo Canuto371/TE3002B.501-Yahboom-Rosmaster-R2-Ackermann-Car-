@@ -1,1 +1,3 @@
-# Proyecto 
+# Implementation of Intelligent Robotics (Gpo 501) 
+
+The challenge consists of developing an autonomous system capable of locating objects within a warehouse using a variety of advanced technologies. Students will need to integrate control algorithms, computer vision, navigation, and artificial intelligence (AI) to develop a robot capable of performing object localization tasks within a warehouse with known geometry. This challenge will be carried out using ROS2, and students must implement the system on an embedded computer such as the Jetson Nano or a similar platform, using available laboratory resources or additional acquired components, provided they meet the established standards.
