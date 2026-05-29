@@ -59,4 +59,3 @@ Adjust package and executable names to your ROS2 package layout or use a launch 
 - `SmartController` priority: obstacle (highest) → vision (stop) → Lyapunov navigation (default).
 - The histogram node supports a `debug` parameter for additional logging; SIFT node displays a visualization window.
 
-If you'd like, I can add a ROS2 Python launch file, a `requirements.txt`, or a visual diagram of node-topic interactions.
