@@ -1,0 +1,22 @@
+{
+  "pedestrians": {
+    "speed_scale": 0.8
+  },
+
+  "stop": {
+    "duration": 5.0,
+    "cooldown": 8.0
+  },
+
+  "forbidden": {
+    "area_ratio_stop": 0.06
+  },
+
+  "loading": {
+    "mode": "ignore"
+  },
+
+  "parking": {
+    "enabled": true
+  }
+}
