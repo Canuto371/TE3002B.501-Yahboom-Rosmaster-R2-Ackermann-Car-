@@ -1,0 +1,73 @@
+{
+  "checkpoints": {
+    "START": [
+      0.4,
+      0.4
+    ],
+    "MIDIN": [
+      1.6,
+      2.0
+    ],
+    "A": [
+      0.4,
+      1.2
+    ],
+    "B": [
+      0.4,
+      2.0
+    ],
+    "C": [
+      0.4,
+      2.8
+    ]
+  },
+  "astar": {
+    "inflation_radius": 0.25,
+    "planner_resolution": 0.04,
+    "map_topic": "/map_for_planning"
+  },
+  "follower": {
+    "max_linear": 0.15,
+    "min_linear": 0.07,
+    "max_angular": 0.7,
+    "lookahead_distance": 0.2,
+    "min_forward_x": 0.04,
+    "final_goal_tolerance": 0.3,
+    "angular_bias": 0.05,
+    "pose_timeout": 3.0,
+    "cmd_vel_topic": "/cmd_vel",
+    "kv": 1.5,
+    "ktheta": 1.7,
+    "wheelbase_L": 0.235,
+    "slow_down_radius": 0.35,
+    "turn_in_place_angle_deg": 55.0,
+    "turn_in_place_linear": 0.035
+  },
+  "reverse_routines": {
+    "A": {
+      "reverse_speed": 0.25,
+      "angular_z": 0.5,
+      "duration": 7.0
+    },
+    "B": {
+      "reverse_speed": 0.25,
+      "angular_z": -0.6,
+      "duration": 5.0
+    },
+    "C": {
+      "reverse_speed": 0.25,
+      "angular_z": -0.6,
+      "duration": 5.0
+    }
+  },
+  "mission": {
+    "target_wait_seconds": 5.0,
+    "initial_x": 0.4,
+    "initial_y": 0.4,
+    "initial_yaw": 0.0,
+    "localization_startup_wait": 12.0,
+    "map_republisher_startup_wait": 2.0,
+    "planner_timeout": 300.0,
+    "follower_timeout": 300.0
+  }
+}
