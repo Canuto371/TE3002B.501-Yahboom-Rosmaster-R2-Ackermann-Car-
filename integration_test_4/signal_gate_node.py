@@ -4,8 +4,7 @@ from pathlib import Path
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Twist
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool, Float32
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -27,37 +26,42 @@ class SignalGateNode(Node):
         self.config = json.loads(self.config_path.read_text())
 
         self.pedestrian_scale = float(
-            self.config['pedestrians']['speed_scale']
+            self.config.get('pedestrians', {}).get('speed_scale', 0.5)
         )
 
         self.stop_duration = float(
-            self.config['stop']['duration']
+            self.config.get('stop', {}).get('duration', 5.0)
         )
 
         self.stop_cooldown = float(
-            self.config['stop']['cooldown']
+            self.config.get('stop', {}).get('cooldown', 8.0)
         )
 
         self.forbidden_area_ratio_stop = float(
-            self.config['forbidden']['area_ratio_stop']
+            self.config.get('forbidden', {}).get('area_ratio_stop', 0.06)
         )
 
-        self.parking_enabled = bool(
-            self.config['parking']['enabled']
-        )
-
-        self.cmd_pub = self.create_publisher(
-            Twist,
-            '/cmd_vel',
+        self.pause_pub = self.create_publisher(
+            Bool,
+            '/motion_pause',
             10
         )
 
-        self.create_subscription(
-            Twist,
-            '/cmd_vel_raw',
-            self.cmd_callback,
+        self.speed_pub = self.create_publisher(
+            Float32,
+            '/speed_scale',
             10
         )
+        #lol
+        self.mission_event_pub = self.create_publisher(
+            String,
+            '/mission_event',
+            10
+        )
+
+        self.loading_event_sent = False
+        self.parking_event_sent = False
+        #
 
         self.create_subscription(
             String,
@@ -73,29 +77,44 @@ class SignalGateNode(Node):
             10
         )
 
-        self.create_subscription(
-            String,
-            '/mission_event',
-            self.mission_event_callback,
-            10
+        self.timer = self.create_timer(
+            0.1,
+            self.policy_loop
         )
 
-        self.active_label = 'none'
-        self.active_until = 0.0
-
-        self.stop_until = 0.0
-        self.last_stop_time = -999.0
-
-        self.loading_completed = False
         self.mission_state = 'UNKNOWN'
 
+        self.stop_until = 0.0
+        self.forbidden_pause_until = 0.0
+        self.last_stop_time = -999.0
+
+        self.speed_scale = 1.0
+        self.speed_scale_until = 0.0
+
+        #
+        ''' lol
         self.get_logger().info(
             f'Signal gate started | config={self.config_path} | '
-            '/cmd_vel_raw -> /cmd_vel'
+            'sub=/detected_signal | pub=/motion_pause,/speed_scale'
+        )'''
+        self.get_logger().info(
+            f'Signal gate started | config={self.config_path} | '
+            'sub=/detected_signal | pub=/motion_pause,/speed_scale,/mission_event'
         )
+        #
 
     def now_sec(self):
         return self.get_clock().now().nanoseconds / 1e9
+    ''''''# lol
+    def publish_mission_event(self, text):
+        msg = String()
+        msg.data = text
+        self.mission_event_pub.publish(msg)
+        self.get_logger().info(f'/mission_event -> {text}')
+    ''''''#
+
+    def mission_state_callback(self, msg):
+        self.mission_state = msg.data
 
     def normalize_label(self, label):
         label = label.strip().lower()
@@ -114,6 +133,11 @@ class SignalGateNode(Node):
             'agv zone': 'agv_area',
             'agv_zone': 'agv_area',
 
+            'avg': 'agv_area',
+            'avg_area': 'agv_area',
+            'avg zone': 'agv_area',
+            'avg_zone': 'agv_area',
+
             'stop': 'stop',
 
             'loading': 'loading',
@@ -128,8 +152,6 @@ class SignalGateNode(Node):
         return aliases.get(label, label)
 
     def parse_signal(self, data):
-        # Expected:
-        # label,score,area_ratio
         parts = [p.strip() for p in data.split(',')]
 
         label = self.normalize_label(parts[0]) if len(parts) >= 1 else 'unknown'
@@ -146,46 +168,18 @@ class SignalGateNode(Node):
 
         return label, score, area_ratio
 
-    def mission_state_callback(self, msg):
-        self.mission_state = msg.data
-
-    def mission_event_callback(self, msg):
-        event = msg.data
-
-        # En esta misión, "loading" real equivale a llegar al cajón
-        # y terminar la espera de 5 segundos.
-        if event == 'target_wait_complete':
-            self.loading_completed = True
-            self.get_logger().info(
-                'Mission target wait complete. Loading considered completed.'
-            )
-
     def signal_callback(self, msg):
         now = self.now_sec()
 
         label, score, area_ratio = self.parse_signal(msg.data)
 
+        self.get_logger().info(
+            f'Received /detected_signal: raw="{msg.data}" | '
+            f'label={label}, score={score:.1f}, area_ratio={area_ratio:.3f}, '
+            f'mission_state={self.mission_state}'
+        )
+
         if label == 'unknown':
-            return
-
-        if label == 'pedestrians':
-            self.active_label = 'pedestrians'
-            self.active_until = now + 2.0
-
-            self.get_logger().info(
-                f'Pedestrians detected | score={score:.1f} | speed scale={self.pedestrian_scale:.2f}',
-                throttle_duration_sec=1.0
-            )
-            return
-
-        if label == 'agv_area':
-            self.active_label = 'agv_area'
-            self.active_until = now + 2.0
-
-            self.get_logger().info(
-                f'AGV zone detected | score={score:.1f} | normal speed',
-                throttle_duration_sec=1.0
-            )
             return
 
         if label == 'stop':
@@ -194,71 +188,99 @@ class SignalGateNode(Node):
                 self.last_stop_time = now
 
                 self.get_logger().warn(
-                    f'STOP detected | stopping for {self.stop_duration:.1f}s'
-                )
-            return
-
-        if label == 'forbidden':
-            if area_ratio >= self.forbidden_area_ratio_stop:
-                self.stop_until = now + 0.8
-
-                self.get_logger().warn(
-                    f'Forbidden area too close | area_ratio={area_ratio:.3f} | stopping',
-                    throttle_duration_sec=0.5
+                    f'STOP accepted. motion_pause TRUE for {self.stop_duration:.1f}s'
                 )
             else:
                 self.get_logger().info(
-                    f'Forbidden seen but not close | area_ratio={area_ratio:.3f}',
+                    'STOP ignored due to cooldown.',
                     throttle_duration_sec=1.0
                 )
             return
 
+        if label == 'pedestrians':
+            self.speed_scale = self.pedestrian_scale
+            self.speed_scale_until = now + 2.0
+
+            self.get_logger().warn(
+                f'PEDESTRIANS accepted. speed_scale={self.speed_scale:.2f}'
+            )
+            return
+
+        if label == 'agv_area':
+            self.speed_scale = 1.0
+            self.speed_scale_until = now + 2.0
+
+            self.get_logger().warn(
+                'AGV accepted. speed_scale=1.0'
+            )
+            return
+
+        if label == 'forbidden':
+            if area_ratio >= self.forbidden_area_ratio_stop:
+                self.forbidden_pause_until = now + 0.8
+
+                self.get_logger().warn(
+                    f'FORBIDDEN close accepted. area_ratio={area_ratio:.3f}. '
+                    'motion_pause TRUE briefly.'
+                )
+            else:
+                self.get_logger().info(
+                    f'FORBIDDEN seen but not close. area_ratio={area_ratio:.3f}'
+                )
+            return
+        #
+        '''lol
         if label == 'loading':
-            # Loading no interrumpe la misión.
-            # La misión espera 5s al llegar al target.
             self.get_logger().info(
-                'Loading sign detected but ignored by gate.',
-                throttle_duration_sec=1.0
+                'LOADING detected but ignored by policy.'
             )
             return
 
         if label == 'parking':
-            if self.parking_enabled and self.loading_completed:
-                self.stop_until = now + 9999.0
-
-                self.get_logger().warn(
-                    'Parking detected after loading complete. Final stop.'
+            self.get_logger().info(
+                'PARKING detected but ignored by policy.'
+            )
+            return'''
+            
+        if label == 'loading':
+            if not self.loading_event_sent:
+                self.publish_mission_event(
+                    'Loading zone detected: waiting to be loaded.'
                 )
+                self.loading_event_sent = True
             return
 
-    def cmd_callback(self, msg):
+        if label == 'parking':
+            if not self.parking_event_sent:
+                self.publish_mission_event(
+                    'Parking zone detected: arrived at the start point of the map.'
+                )
+                self.parking_event_sent = True
+            return
+        #
+
+    def policy_loop(self):
         now = self.now_sec()
 
-        out = Twist()
+        if now > self.speed_scale_until:
+            self.speed_scale = 1.0
 
-        # Stop modes: stop sign, forbidden close, final parking.
+        should_pause = False
+
         if now < self.stop_until:
-            self.cmd_pub.publish(out)
-            return
+            should_pause = True
 
-        scale = 1.0
+        if now < self.forbidden_pause_until:
+            should_pause = True
 
-        if now < self.active_until:
-            if self.active_label == 'pedestrians':
-                scale = self.pedestrian_scale
-            elif self.active_label == 'agv_area':
-                scale = 1.0
+        pause_msg = Bool()
+        pause_msg.data = should_pause
 
-        out.linear.x = msg.linear.x * scale
-        out.linear.y = msg.linear.y * scale
-        out.linear.z = msg.linear.z * scale
+        speed_msg = Float32()
+        speed_msg.data = float(self.speed_scale)
 
-        # Escalamos angular también para no sobrecorregir cuando va más lento.
-        out.angular.x = msg.angular.x * scale
-        out.angular.y = msg.angular.y * scale
-        out.angular.z = msg.angular.z * scale
-
-        self.cmd_pub.publish(out)
+        self.pause_pub.publish(pause_msg)
+        self.speed_pub.publish(speed_msg)
 
 
 def main(args=None):
@@ -271,7 +293,9 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.cmd_pub.publish(Twist())
+        node.pause_pub.publish(Bool(data=False))
+        node.speed_pub.publish(Float32(data=1.0))
+
         node.destroy_node()
         rclpy.shutdown()
 
