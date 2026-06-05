@@ -36,14 +36,6 @@ In the full ROS 2 system, the detections published by this module are consumed b
 										+---------------------------+
 ```
 
-## Python Files
-
-| File | Purpose | Node name | Subscribes to | Publishes to | Parameters / config values | Key logic |
-| --- | --- | --- | --- | --- | --- | --- |
-| `Histogram/sign_vision_core.py` | Shared computer vision utilities for the histogram-based sign detector. It isolates candidate white sign regions, filters sign-like content, builds descriptors, loads reference examples, and compares candidates against known classes. | Not a ROS 2 node | None | None | No ROS parameters. Internal thresholds include white-patch filtering, color-ratio gates, histogram binning, and shape similarity scoring. | Detects vertical white sign-like rectangles, crops the inner region, normalizes color, builds a combined HSV histogram and binary shape mask, then classifies by comparing against reference descriptors. |
-| `Histogram/sign_detector_direct_node.py` | ROS 2 camera node that applies the histogram-based pipeline and publishes the detected traffic sign label and confidence. | `sign_detector_direct_node` | None | `/detected_signal` (`std_msgs/String`) | `camera_index`, `publish_topic`, `min_score`, `process_fps`, `stable_frames`, `debug` | Reads frames from the camera, finds candidate signs via `sign_vision_core`, classifies each candidate against stored references, applies a temporal stability filter, and publishes stable detections only. |
-| `SIFT/sift_node.py` | ROS 2 camera node that performs feature-based traffic sign recognition using SIFT descriptors and brute-force matching. | `sift_signal_node` | None | `/detected_signal` (`std_msgs/String`) | No ROS parameters. Uses a reference image database loaded from the `fotos` folder under the `integration_test_1` package share directory, plus hard-coded matching thresholds. | Uses a color gate to reject non-sign frames, computes SIFT features for the live frame, compares them against stored descriptor sets, keeps the best-scoring class, and smooths output over multiple frames before publishing. |
-
 ## File Details
 
 ### `Histogram/sign_vision_core.py`
@@ -142,8 +134,3 @@ Camera frame
 2. Launch either the histogram detector or the SIFT detector.
 3. Subscribe to `/detected_signal` from the controller or mission logic that decides how the vehicle should react.
 
-## Maintenance Tips
-
-- Keep reference images organized by class name so classification stays consistent.
-- Tune thresholds in `sign_vision_core.py` if lighting, camera exposure, or sign styles change.
-- Update the README whenever new Python files are added to this folder so the documentation stays aligned with the code.

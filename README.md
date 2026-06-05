@@ -4,6 +4,15 @@ This repository contains ROS2-compatible Python nodes and helpers developed for 
 
 ---
 
+**Module documentation**
+
+- [Computer Vision/README.md](Computer%20Vision/README.md)
+- [Navigation/README.md](Navigation/README.md)
+- [Control/README.md](Control/README.md)
+- [Obstacle Avoidance/README.md](Obstacle%20Avoidance/README.md)
+
+---
+
 **Repository overview (current)**
 
 - `Computer Vision/`
