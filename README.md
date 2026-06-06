@@ -1,6 +1,14 @@
-# Implementation of Intelligent Robotics (Gpo 501)
+# Design and Implementation of an Autonomous Vehicle Using ROS 2
 
-This repository contains ROS2-compatible Python nodes and helpers developed for an autonomous robotics assignment. The code integrates computer vision, obstacle avoidance, planning and mission orchestration. The nodes are runnable either via `ros2 run` (when packaged) or directly with `python3` after sourcing your ROS2 environment.
+**Course:** Implementation of Intelligent Robotics — TE3002B  
+**Institution:** Tecnológico de Monterrey, Campus Guadalajara  
+
+**Authors:**  
+Elizabeth Jáuregui Zárate, Gonzalo Flores García, Ana María Rodríguez Peña, Vanessa Cerda Carrillo, Sofia Knutas
+
+---
+
+This repository contains ROS 2-compatible Python nodes and helpers developed for an autonomous Ackermann-steered vehicle. The code integrates computer vision, obstacle avoidance, path planning, and mission orchestration. The nodes are runnable either via `ros2 run` (when packaged) or directly with `python3` after sourcing your ROS 2 environment.
 
 ---
 
